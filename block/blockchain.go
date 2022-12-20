@@ -8,6 +8,7 @@ import (
 	"goblockchain/utils"
 	"log"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -15,6 +16,7 @@ const (
 	MiningDifficulty = 3
 	MiningSender     = "THE BLOCKCHAIN"
 	MiningReward     = 1.0
+	MiningTimerSec   = 20
 )
 
 type Block struct {
@@ -67,6 +69,7 @@ type Blockchain struct {
 	chain             []*Block
 	blockchainAddress string
 	port              uint16
+	mux               sync.Mutex
 }
 
 func NewBlockchain(blockchainAddress string, port uint16) *Blockchain {
@@ -159,12 +162,25 @@ func (bc *Blockchain) ValidProof(nonce int, previousHash [32]byte, transactions 
 }
 
 func (bc *Blockchain) Mining() bool {
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
+	//If transaction pool is empty not mine
+	if len(bc.transactionPool) == 0 {
+		return false
+	}
+	log.Printf("4")
+
 	bc.AddTransaction(MiningSender, bc.blockchainAddress, MiningReward, nil, nil)
 	nonce := bc.ProofOfWork()
 	previousHash := bc.LastBlock().Hash()
 	bc.CreateBlock(nonce, previousHash)
 	log.Println("action=mining, status=success")
 	return true
+}
+
+func (bc *Blockchain) StartMining() {
+	bc.Mining()
+	_ = time.AfterFunc(time.Second*MiningTimerSec, bc.StartMining)
 }
 
 func (bc *Blockchain) CalculateTotalAmount(blockchainAddress string) float32 {

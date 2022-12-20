@@ -23,7 +23,7 @@ func NewBlockchainServer(port uint16) *BlockchainServer {
 	}
 }
 
-func (bcs BlockchainServer) GetBlockchain() *block.Blockchain {
+func (bcs *BlockchainServer) GetBlockchain() *block.Blockchain {
 	bc, ok := cache["blockchain"]
 	if !ok {
 		minersWallet := wallet.NewWallet()
@@ -36,11 +36,11 @@ func (bcs BlockchainServer) GetBlockchain() *block.Blockchain {
 	return bc
 }
 
-func (bcs BlockchainServer) Port() uint16 {
+func (bcs *BlockchainServer) Port() uint16 {
 	return bcs.port
 }
 
-func (bcs BlockchainServer) GetChain(w http.ResponseWriter, req *http.Request) {
+func (bcs *BlockchainServer) GetChain(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 		w.Header().Add("Content-Type", "application/json")
@@ -52,7 +52,7 @@ func (bcs BlockchainServer) GetChain(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (bcs BlockchainServer) Transactions(w http.ResponseWriter, req *http.Request) {
+func (bcs *BlockchainServer) Transactions(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 		w.Header().Add("Content-Type", "application/json")
@@ -101,8 +101,49 @@ func (bcs BlockchainServer) Transactions(w http.ResponseWriter, req *http.Reques
 	}
 }
 
-func (bcs BlockchainServer) Run() {
+func (bcs *BlockchainServer) Mine(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		bc := bcs.GetBlockchain()
+		isMined := bc.Mining()
+		var m []byte
+		if !isMined {
+			log.Printf("ERROR: Not mined")
+			w.WriteHeader(http.StatusBadRequest)
+			m = utils.JsonStatus("fail")
+		} else {
+			m = utils.JsonStatus("success")
+		}
+		w.Header().Add("Content-Type", "application/json")
+		io.WriteString(w, string(m))
+	default:
+		log.Printf("ERROR: http method ivalid")
+		io.WriteString(w, string(utils.JsonStatus("fails")))
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	return
+}
+
+func (bcs *BlockchainServer) StartMine(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		bc := bcs.GetBlockchain()
+		bc.StartMining()
+		m := utils.JsonStatus("success")
+		w.Header().Add("Content-Type", "application/json")
+		io.WriteString(w, string(m))
+	default:
+		log.Printf("ERROR: http method ivalid")
+		io.WriteString(w, string(utils.JsonStatus("fails")))
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	return
+}
+
+func (bcs *BlockchainServer) Run() {
 	http.HandleFunc("/", bcs.GetChain)
 	http.HandleFunc("/transactions", bcs.Transactions)
+	http.HandleFunc("/mine", bcs.Mine)
+	http.HandleFunc("/mine/start", bcs.StartMine)
 	log.Fatal(http.ListenAndServe("0.0.0.0:"+strconv.Itoa(int(bcs.Port())), nil))
 }
