@@ -42,11 +42,11 @@
                     contentType: 'application/json',
                     data: JSON.stringify(transaction_data),
                     success: function (response) {
-                        if ($.parseJSON(response).message == 'fail'){
+                        console.log(response);
+                        if (response.message === 'fail'){
                             alert("failed")
                             return
                         }
-                        console.info(response);
                         alert('Send success');
                     },
                     error: function (response) {

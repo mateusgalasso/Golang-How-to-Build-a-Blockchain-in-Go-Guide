@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	MiningDificulty = 3
-	MiningSender    = "THE BLOCKCHAIN"
-	MiningReward    = 1.0
+	MiningDifficulty = 3
+	MiningSender     = "THE BLOCKCHAIN"
+	MiningReward     = 1.0
 )
 
 type Block struct {
@@ -69,7 +69,7 @@ type Blockchain struct {
 	port              uint16
 }
 
-func NewBlockhain(blockchainAddress string, port uint16) *Blockchain {
+func NewBlockchain(blockchainAddress string, port uint16) *Blockchain {
 	b := &Block{}
 	bc := new(Blockchain)
 	bc.blockchainAddress = blockchainAddress
@@ -78,7 +78,7 @@ func NewBlockhain(blockchainAddress string, port uint16) *Blockchain {
 	return bc
 }
 
-func (bc Blockchain) MarshalJSON() ([]byte, error) {
+func (bc *Blockchain) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Blocks []*Block `json:"chains"`
 	}{
@@ -104,7 +104,10 @@ func (bc *Blockchain) Print() {
 		fmt.Printf("%s\n", strings.Repeat("*", 25))
 	}
 }
-
+func (bc *Blockchain) CreateTransaction(sender string, recipient string, value float32, senderPublicKey *ecdsa.PublicKey, signature *utils.Signature) bool {
+	isTransacted := bc.AddTransaction(sender, recipient, value, senderPublicKey, signature)
+	return isTransacted
+}
 func (bc *Blockchain) AddTransaction(sender string, recipient string, value float32, senderPublicKey *ecdsa.PublicKey, signature *utils.Signature) bool {
 	transaction := NewTransaction(sender, recipient, value)
 	//If sender is the miner than, ok
@@ -128,7 +131,7 @@ func (bc *Blockchain) AddTransaction(sender string, recipient string, value floa
 
 func (bc *Blockchain) VerifyTransactionSignature(key *ecdsa.PublicKey, signature *utils.Signature, transaction *Transaction) bool {
 	m, _ := json.Marshal(transaction)
-	hash := sha256.Sum256([]byte(m))
+	hash := sha256.Sum256(m)
 	return ecdsa.Verify(key, hash[:], signature.R, signature.S)
 }
 
@@ -183,10 +186,14 @@ func (bc *Blockchain) ProofOfWork() int {
 	transactions := bc.CopyTransactionPool()
 	previousHash := bc.LastBlock().Hash()
 	nonce := 0
-	for !bc.ValidProof(nonce, previousHash, transactions, MiningDificulty) {
+	for !bc.ValidProof(nonce, previousHash, transactions, MiningDifficulty) {
 		nonce++
 	}
 	return nonce
+}
+
+func (bc *Blockchain) TransactionPool() []*Transaction {
+	return bc.transactionPool
 }
 
 type Transaction struct {

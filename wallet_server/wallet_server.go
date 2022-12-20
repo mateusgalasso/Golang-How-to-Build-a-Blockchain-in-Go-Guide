@@ -112,6 +112,7 @@ func (ws *WalletServer) CreateTransaction(w http.ResponseWriter, req *http.Reque
 		w.WriteHeader(http.StatusBadRequest)
 		log.Println("ERROR: Invalid HTTP Method")
 	}
+	return
 }
 
 func (ws *WalletServer) Run() {
