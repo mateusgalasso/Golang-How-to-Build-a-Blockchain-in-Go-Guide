@@ -1,12 +1,14 @@
 package block
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"goblockchain/utils"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -101,6 +103,13 @@ func (bc *Blockchain) CreateBlock(nonce int, previousHash [32]byte) *Block {
 	b := newBlock(nonce, previousHash, bc.transactionPool)
 	bc.chain = append(bc.chain, b)
 	bc.transactionPool = []*Transaction{}
+	for _, neighbor := range bc.neighbors {
+		endpoint := fmt.Sprintf("http://%s/transactions", neighbor)
+		cliente := &http.Client{}
+		req, _ := http.NewRequest("DELETE", endpoint, nil)
+		response, _ := cliente.Do(req)
+		log.Printf("%v", response)
+	}
 	return b
 }
 
@@ -115,10 +124,34 @@ func (bc *Blockchain) Print() {
 		fmt.Printf("%s\n", strings.Repeat("*", 25))
 	}
 }
+
 func (bc *Blockchain) CreateTransaction(sender string, recipient string, value float32, senderPublicKey *ecdsa.PublicKey, signature *utils.Signature) bool {
 	isTransacted := bc.AddTransaction(sender, recipient, value, senderPublicKey, signature)
+
+	if isTransacted {
+		for _, neighbor := range bc.neighbors {
+			publicKeyStr := fmt.Sprintf("%064x%064x", senderPublicKey.X.Bytes(), senderPublicKey.Y.Bytes())
+			signatureStr := signature.String()
+			bt := &TransactionRequest{
+				SenderBlockchainAddress:    &sender,
+				RecipientBlockchainAddress: &recipient,
+				SenderPublicKey:            &publicKeyStr,
+				Value:                      &value,
+				Signature:                  &signatureStr,
+			}
+			m, _ := json.Marshal(bt)
+			buf := bytes.NewBuffer(m)
+			endpoint := fmt.Sprintf("http://%s/transactions", neighbor)
+			cliente := &http.Client{}
+			req, _ := http.NewRequest("PUT", endpoint, buf)
+			response, _ := cliente.Do(req)
+			log.Printf("%v", response)
+		}
+	}
+
 	return isTransacted
 }
+
 func (bc *Blockchain) AddTransaction(sender string, recipient string, value float32, senderPublicKey *ecdsa.PublicKey, signature *utils.Signature) bool {
 	transaction := NewTransaction(sender, recipient, value)
 	//If sender is the miner than, ok
@@ -239,6 +272,10 @@ func (bc *Blockchain) StartSyncNeighbors() {
 
 func (bc *Blockchain) TransactionPool() []*Transaction {
 	return bc.transactionPool
+}
+
+func (bc *Blockchain) ClearTransactionPool() {
+	bc.transactionPool = bc.transactionPool[:0]
 }
 
 type Transaction struct {
